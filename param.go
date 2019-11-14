@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type MethodParam struct {
+type methodParam struct {
 	Name            string
 	Type            string
 	TypePackage     string
@@ -14,21 +14,21 @@ type MethodParam struct {
 	RequiredImports map[string]bool
 }
 
-func (p *MethodParam) Parse(f *ast.Field) {
+func (p *methodParam) parse(f *ast.Field) {
 	p.RequiredImports = make(map[string]bool)
 
 	switch f.Type.(type) {
 	case *ast.SelectorExpr:
-		p.TypeFromSelectorExpr(f.Type.(*ast.SelectorExpr))
+		p.typeFromSelectorExpr(f.Type.(*ast.SelectorExpr))
 
 	case *ast.Ident:
-		p.TypeFromIdent(f.Type.(*ast.Ident))
+		p.typeFromIdent(f.Type.(*ast.Ident))
 
 	case *ast.StarExpr:
-		p.TypeFromStarExpr(f.Type.(*ast.StarExpr))
+		p.typeFromStarExpr(f.Type.(*ast.StarExpr))
 
 	case *ast.ArrayType:
-		p.TypeFromArray(f.Type.(*ast.ArrayType))
+		p.typeFromArray(f.Type.(*ast.ArrayType))
 
 	default:
 		panic("unhandled type")
@@ -39,7 +39,7 @@ func (p *MethodParam) Parse(f *ast.Field) {
 	}
 }
 
-func (p *MethodParam) TypeFromSelectorExpr(sExp *ast.SelectorExpr) {
+func (p *methodParam) typeFromSelectorExpr(sExp *ast.SelectorExpr) {
 	if sExp.X != nil {
 		ident := sExp.X.(*ast.Ident)
 		p.TypePackage = ident.Name
@@ -53,7 +53,7 @@ func (p *MethodParam) TypeFromSelectorExpr(sExp *ast.SelectorExpr) {
 	}
 }
 
-func (p *MethodParam) TypeFromStarExpr(sExp *ast.StarExpr) {
+func (p *methodParam) typeFromStarExpr(sExp *ast.StarExpr) {
 	p.Pointer = true
 
 	switch sExp.X.(type) {
@@ -62,7 +62,7 @@ func (p *MethodParam) TypeFromStarExpr(sExp *ast.StarExpr) {
 		p.Name = strings.ToLower(p.Type)
 	case *ast.SelectorExpr:
 		sExpX := sExp.X.(*ast.SelectorExpr)
-		p.TypeFromSelectorExpr(sExpX)
+		p.typeFromSelectorExpr(sExpX)
 		p.Name = strings.ToLower(sExpX.Sel.Name)
 
 	default:
@@ -70,7 +70,7 @@ func (p *MethodParam) TypeFromStarExpr(sExp *ast.StarExpr) {
 	}
 }
 
-func (p *MethodParam) TypeFromIdent(ident *ast.Ident) {
+func (p *methodParam) typeFromIdent(ident *ast.Ident) {
 	p.Type = ident.Name
 
 	if p.Name == "" {
@@ -78,18 +78,18 @@ func (p *MethodParam) TypeFromIdent(ident *ast.Ident) {
 	}
 }
 
-func (p *MethodParam) TypeFromArray(arr *ast.ArrayType) {
+func (p *methodParam) typeFromArray(arr *ast.ArrayType) {
 	p.Array = true
 
 	switch arr.Elt.(type) {
 	case *ast.SelectorExpr:
-		p.TypeFromSelectorExpr(arr.Elt.(*ast.SelectorExpr))
+		p.typeFromSelectorExpr(arr.Elt.(*ast.SelectorExpr))
 
 	case *ast.Ident:
-		p.TypeFromIdent(arr.Elt.(*ast.Ident))
+		p.typeFromIdent(arr.Elt.(*ast.Ident))
 
 	case *ast.StarExpr:
-		p.TypeFromStarExpr(arr.Elt.(*ast.StarExpr))
+		p.typeFromStarExpr(arr.Elt.(*ast.StarExpr))
 
 	default:
 		panic("unhandled type")

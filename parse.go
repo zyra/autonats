@@ -13,21 +13,23 @@ import (
 	"strings"
 )
 
+// Parser config
 type ParserConfig struct {
-	BaseDir     string
-	NatsTimeout int
-	OutFileName string
+	BaseDir     string // Directory containing interfaces to scan
+	NatsTimeout int    // Timeout for NATS requests
+	OutFileName string // Output file name
 }
 
+// Parser object
 type Parser struct {
 	*ParserConfig
-	services []*Service
+	services []*service
 	rawPkgs  map[string]*ast.Package
-	pkgs     map[string]*Package
+	pkgs     map[string]*pkg
 }
 
-type Package struct {
-	Services       []*Service
+type pkg struct {
+	Services       []*service
 	Imports        map[string]string
 	Name           string
 	BaseDir        string
@@ -35,11 +37,12 @@ type Package struct {
 	FileName       string
 }
 
+// Creates a new parser with the provided config
 func NewParser(config *ParserConfig) (p *Parser, err error) {
 	p = &Parser{
 		ParserConfig: config,
-		services:     make([]*Service, 0),
-		pkgs:         make(map[string]*Package),
+		services:     make([]*service, 0),
+		pkgs:         make(map[string]*pkg),
 	}
 
 	fset := token.NewFileSet()
@@ -67,6 +70,7 @@ func NewParser(config *ParserConfig) (p *Parser, err error) {
 	}
 }
 
+// Runs the parser and outputs generated code to file
 func (p *Parser) Run() {
 	p.loadServices()
 	p.createPkgs()
@@ -83,7 +87,7 @@ func (p *Parser) loadServices() {
 
 				decl, ok := node.(*ast.GenDecl)
 
-				if ! ok {
+				if !ok {
 					return true
 				}
 
@@ -98,14 +102,14 @@ func (p *Parser) loadServices() {
 
 				typeSpec, ok := decl.Specs[0].(*ast.TypeSpec)
 
-				if ! ok {
+				if !ok {
 					log.Println("invalid spec type")
 					return false
 				}
 
 				iface, ok := typeSpec.Type.(*ast.InterfaceType)
 
-				if ! ok {
+				if !ok {
 					log.Println("couldn't find an interface")
 					return false
 				}
@@ -115,12 +119,12 @@ func (p *Parser) loadServices() {
 					return false
 				}
 
-				service := new(Service)
+				service := new(service)
 				service.PackageName = v.Name
 				service.Basedir = filepath.Dir(fk)
 				service.InterfaceID = typeSpec.Name.Name
 
-				service.FromInterface(iface, fv)
+				service.fromInterface(iface, fv)
 
 				docText := decl.Doc.Text()
 
@@ -156,9 +160,9 @@ func (p *Parser) createPkgs() {
 	for _, s := range p.services {
 		_, ok := p.pkgs[s.FileName]
 
-		if ! ok {
-			p.pkgs[s.FileName] = &Package{
-				Services:       make([]*Service, 0),
+		if !ok {
+			p.pkgs[s.FileName] = &pkg{
+				Services:       make([]*service, 0),
 				Imports:        make(map[string]string),
 				Name:           s.PackageName,
 				BaseDir:        s.Basedir,

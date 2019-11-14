@@ -5,41 +5,41 @@ import (
 	"strings"
 )
 
-type Service struct {
+type service struct {
 	InterfaceID string
 	Name        string
-	Methods     []*ServiceMethod
+	Methods     []*serviceMethod
 	Imports     map[string]string
 	Basedir     string
 	PackageName string
 	FileName    string
 }
 
-func (s *Service) FromInterface(iface *ast.InterfaceType, file *ast.File) {
-	s.Methods = make([]*ServiceMethod, iface.Methods.NumFields())
+func (s *service) fromInterface(iface *ast.InterfaceType, file *ast.File) {
+	s.Methods = make([]*serviceMethod, iface.Methods.NumFields())
 	s.Imports = make(map[string]string)
 	s.FileName = file.Name.Name
 
 	for i, m := range iface.Methods.List {
-		method := new(ServiceMethod)
-		method.FromFuncType(m.Type.(*ast.FuncType))
+		method := new(serviceMethod)
+		method.fromFuncType(m.Type.(*ast.FuncType))
 		method.Name = m.Names[0].Name
 		s.Methods[i] = method
 	}
 
-	s.CombineImports(file)
+	s.combineImports(file)
 }
 
-func (s *Service) CombineImports(file *ast.File) {
+func (s *service) combineImports(file *ast.File) {
 	imports := make(map[string]bool)
 
 	for _, m := range s.Methods {
-		for k, _ := range m.imports {
+		for k := range m.imports {
 			imports[k] = true
 		}
 	}
 
-	for k, _ := range imports {
+	for k := range imports {
 		var name, path string
 
 		for _, i := range file.Imports {
