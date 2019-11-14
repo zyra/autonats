@@ -67,6 +67,12 @@ func NewParser(config *ParserConfig) (p *Parser, err error) {
 	}
 }
 
+func (p *Parser) Run() {
+	p.loadServices()
+	p.createPkgs()
+	p.render()
+}
+
 func (p *Parser) loadServices() {
 	for _, v := range p.rawPkgs {
 		for fk, fv := range v.Files {
