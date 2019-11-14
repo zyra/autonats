@@ -1,0 +1,93 @@
+---
+kind: pipeline
+type: docker
+name: default
+
+clone:
+  depth: 1
+
+volumes:
+- name: dockersock
+  host:
+    path: /var/run/docker.sock
+
+x-docker-step: &docker-step
+  image: docker
+  volumes:
+  - name: dockersock
+    path: /var/run/docker.sock
+  environment:
+    BUILD_TAG: ${DRONE_BRANCH}-${DRONE_COMMIT}
+    DOCKER_USERNAME:
+      from_secret: DOCKER_USERNAME
+    DOCKER_PASSWORD:
+      from_secret: DOCKER_PASSWORD
+
+x-docker-auth:
+- &docker-auth docker login harbor.zyra.ca -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+
+
+steps:
+- name: Build docker image
+  <<: *docker-step
+  commands:
+  - docker build -t harbor.zyra.ca/public/autonats:$BUILD_TAG .
+
+- name: Push docker image
+  <<: *docker-step
+  commands:
+  - *docker-auth
+  - docker push harbor.zyra.ca/public/autonats:$BUILD_TAG
+
+- name: Push latest docker image
+  <<: *docker-step
+  when:
+    branch:
+    - master
+  commands:
+  - *docker-auth
+  - docker tag harbor.zyra.ca/public/autonats:$BUILD_TAG harbor.zyra.ca/public/autonats:latest
+  - docker push harbor.zyra.ca/public/autonats:latest
+
+- name: Push version tagged image
+  <<: *docker-step
+  when:
+    event:
+    - tag
+  commands:
+  - *docker-auth
+  - docker tag harbor.zyra.ca/public/autonats:$BUILD_TAG harbor.zyra.ca/public/autonats:$DRONE_TAG
+  - docker push harbor.zyra.ca/public/autonats:$DRONE_TAG
+
+
+- name: Build binaries
+  image: golang:1.12-alpine
+  when:
+    event:
+    - tag
+  commands:
+  - apk add git make
+  - make build -j$(nproc)
+
+- name: Publish binaries to Github
+  image: plugins/github-release
+  when:
+    event:
+    - tag
+  settings:
+    api_key:
+      from_secret: github_secret
+    files:
+    - bin/autonats_darwin_amd64
+    - bin/autonats_linux_amd64
+    - bin/autonats_windows_amd64.exe
+    checksum:
+    - md5
+    - sha1
+    - sha256
+    - sha512
+---
+kind: signature
+hmac: 6e02894600293932b93200745b99a7a44e6cef376304ae6369a0cb42e00e8257
+
+...
