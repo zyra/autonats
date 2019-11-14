@@ -1,5 +1,6 @@
 # Autonats
 [![Build Status](https://drone.zyra.ca/api/badges/zyra/autonats/status.svg)](https://drone.zyra.ca/zyra/autonats)
+[![Go Report Card](https://goreportcard.com/badge/github.com/zyra/autonats)](https://goreportcard.com/badge/github.com/zyra/autonats)
 
 Generate NATS client code and server handlers from Go interfaces. 
 
