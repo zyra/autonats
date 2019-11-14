@@ -247,12 +247,6 @@ func (p *Parser) render() {
 						for _, p := range m.Results {
 							pc := Add()
 
-							if p.Type == "error" {
-								pc.Id("e")
-							} else {
-								pc.Id("r")
-							}
-
 							if p.Array {
 								pc.Op("[]")
 							}
@@ -275,9 +269,28 @@ func (p *Parser) render() {
 
 					fx.BlockFunc(func(g *Group) {
 						g.Var().Id("d").Op("[]").Byte()
+						g.Var().Id("e").Error()
 
-						if !m.Reply {
-							g.Var().Id("e").Error()
+						if len(m.Results) > 1 {
+							mp :=  m.Results[0]
+
+							it := g.Var().Id("r")
+
+							if mp.Array {
+								it.Op("[]")
+
+								if mp.Pointer {
+									it.Op("*")
+								}
+							}
+
+							if mp.TypePackage != "" {
+								if mp.TypePackage != "" {
+									it.Qual(imps[mp.TypePackage], mp.Type)
+								} else {
+									it.Id(mp.Type)
+								}
+							}
 						}
 
 						if len(m.Params) > 0 {
@@ -344,19 +357,19 @@ func (p *Parser) render() {
 
 						g.If().Id("d").Op(",").Id("e").Op("=").Id("c").Dot("handleRequest").Call(handleRequestParams).Op(";").Id("e").Op("!=").Nil().BlockFunc(requestErrorBlock).Else().If().Id("e").Op("=").Qual("encoding/json", "Unmarshal").CallFunc(func(g *Group) {
 							g.Id("d")
-
-							if !m.Results[0].Pointer || m.Results[0].Array {
-								g.Add(Op("&").Id("r"))
-							} else {
-								g.Id("r")
-							}
+							g.Add(Op("&").Id("r"))
 						}).Op(";").Id("e").Op("!=").Nil().Block(
 							Return(Nil(), Qual("fmt", "Errorf").Call(
 								Lit("unable to unmarshal response: %s"), Id("e").Dot("Error").Call()),
 							),
-						).Else().Block(
-							Return(Id("r"), Nil()),
-						)
+						).Else().BlockFunc(func(g *Group) {
+							if m.Results[0].Pointer && !m.Results[0].Array {
+								g.Return(Op("&").Id("r"), Nil())
+								return
+							}
+
+							g.Return(Id("r"), Nil())
+						})
 					})
 
 				}
@@ -368,7 +381,7 @@ func (p *Parser) render() {
 						Return(Nil(), Qual("fmt", "Errorf").Call(Lit("unable to marshal request: %s"), Id("e").Dot("Error").Call())),
 					).Else().If().Id("m").Op(",").Id("e").Op(":=").Id("c").Dot("nc").Dot("Request").Call(Id("r").Dot("Subject"), Id("d"), Qual("time", "Second").Op("*").Lit(p.NatsTimeout)).Op(";").Id("e").Op("!=").Nil().Block(
 						Return(Nil(), Id("e")),
-					).Else().If().Id("e").Op(":=").Qual("encoding/json", "Unmarshal").Call(Id("m").Dot("Data"), Id("r")).Op(";").Id("e").Op("!=").Nil().Block(
+					).Else().If().Id("e").Op(":=").Qual("encoding/json", "Unmarshal").Call(Id("m").Dot("Data"), Op("&").Id("r")).Op(";").Id("e").Op("!=").Nil().Block(
 						Return(Nil(), Id("e")),
 					).Else().If().Id("r").Dot("Error").Op("!=").Nil().Block(
 						Return(Nil(), Id("r").Dot("Error")),
