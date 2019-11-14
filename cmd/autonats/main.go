@@ -41,14 +41,12 @@ func main() {
 					Name:     "dir, d",
 					Usage:    "Base directory to search for matching interfaces",
 					EnvVar:   "AUTONATS_BASE_DIR",
-					Required: true,
 					Value:    wd,
 				},
 				cli.IntFlag{
 					Name:     "timeout, t",
 					Usage:    "NATS request timeout in seconds",
 					EnvVar:   "AUTONATS_REQUEST_TIMEOUT",
-					Required: false,
 					Value:    3,
 				},
 				cli.StringFlag{

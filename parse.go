@@ -560,12 +560,8 @@ func (p *Parser) render() {
 			panic(str)
 		}
 
-		str := buff.String()
-
 		if err := ioutil.WriteFile(filepath.Join(pkg.BaseDir, p.OutFileName), buff.Bytes(), 0655); err != nil {
 			panic(err)
 		}
-
-		println(str)
 	}
 }
