@@ -272,7 +272,7 @@ func (p *Parser) render() {
 						g.Var().Id("e").Error()
 
 						if len(m.Results) > 1 {
-							mp :=  m.Results[0]
+							mp := m.Results[0]
 
 							it := g.Var().Id("r")
 
@@ -285,11 +285,9 @@ func (p *Parser) render() {
 							}
 
 							if mp.TypePackage != "" {
-								if mp.TypePackage != "" {
-									it.Qual(imps[mp.TypePackage], mp.Type)
-								} else {
-									it.Id(mp.Type)
-								}
+								it.Qual(imps[mp.TypePackage], mp.Type)
+							} else {
+								it.Id(mp.Type)
 							}
 						}
 
@@ -427,8 +425,9 @@ func (p *Parser) render() {
 					Id("handler").Op(":=").New(Id(handlerName)),
 					Id("handler").Dot("server").Op("=").Id("server"),
 					Id("ch").Op(":=").Make(Chan().Op("*").Qual("github.com/nats-io/nats.go", "Msg"), Lit(10)),
-					If().Id("s").Op(",").Id("e").Op(":=").Id("nc").Dot("ChanSubscribe").Call(
-						Lit("gonats."+s.Name+".>"),
+					If().Id("s").Op(",").Id("e").Op(":=").Id("nc").Dot("ChanQueueSubscribe").Call(
+						Lit("autonats."+s.Name+".>"),
+						Lit("autonats.Handler"),
 						Id("ch"),
 					).Op(";").Id("e").Op("!=").Nil().Block(
 						Return(Nil(), Id("e")),
