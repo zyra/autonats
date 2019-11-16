@@ -78,7 +78,7 @@ if err != nil {
 ```
 
 ##### Client code
-```shell script
+```go
 import (
   "github.com/nats-io/nats.go"
   "log"
