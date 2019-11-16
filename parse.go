@@ -60,7 +60,7 @@ func NewParser(config *ParserConfig) (p *Parser, err error) {
 	}
 
 	if config.NatsTimeout == 0 {
-		config.NatsTimeout = 3
+		config.NatsTimeout = 5
 	}
 
 	if p.rawPkgs, err = parser.ParseDir(fset, config.BaseDir, nil, 4); err != nil {

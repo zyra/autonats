@@ -47,7 +47,7 @@ func main() {
 					Name:     "timeout, t",
 					Usage:    "NATS request timeout in seconds",
 					EnvVar:   "AUTONATS_REQUEST_TIMEOUT",
-					Value:    3,
+					Value:    5,
 				},
 				cli.StringFlag{
 					Name:   "out, o",
