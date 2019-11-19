@@ -341,7 +341,7 @@ func (p *Parser) render() {
 							}
 						}
 						handleRequestParams := Op("&").Qual("github.com/zyra/autonats", "Request").Block(
-							Id("Subject").Op(":").Lit("gonats." + s.Name + "." + m.Name).Op(",").Id("Data").Op(":").Id("d").Op(","),
+							Id("Subject").Op(":").Lit("autonats." + s.Name + "." + m.Name).Op(",").Id("Data").Op(":").Id("d").Op(","),
 						)
 
 						if !m.Reply || len(m.Results) == 1 {
@@ -467,7 +467,7 @@ func (p *Parser) render() {
 					),
 					Switch(Id("msg").Dot("Subject")).BlockFunc(func(g *Group) {
 						for _, m := range s.Methods {
-							subject := "gonats." + s.Name + "." + m.Name
+							subject := "autonats." + s.Name + "." + m.Name
 							it := g.Case(Lit(subject))
 
 							if len(m.Params) > 0 {
