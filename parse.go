@@ -381,8 +381,8 @@ func (p *Parser) render() {
 						Return(Nil(), Id("e")),
 					).Else().If().Id("e").Op(":=").Qual("encoding/json", "Unmarshal").Call(Id("m").Dot("Data"), Op("&").Id("r")).Op(";").Id("e").Op("!=").Nil().Block(
 						Return(Nil(), Id("e")),
-					).Else().If().Id("r").Dot("Error").Op("!=").Nil().Block(
-						Return(Nil(), Id("r").Dot("Error")),
+					).Else().If().Id("r").Dot("Error").Op("!=").Lit("").Block(
+						Return(Nil(), Qual("errors", "New").Call(Id("r").Dot("Error"))),
 					).Else().Block(
 						Return(Id("r").Dot("Data"), Nil()),
 					),
@@ -534,7 +534,7 @@ func (p *Parser) render() {
 							}
 
 							it.Op(";").Id("err").Op("!=").Nil().Block(
-								Id("r").Dot("Error").Op("=").Id("err"),
+								Id("r").Dot("Error").Op("=").Id("err").Dot("Error").Call(),
 							)
 
 							if len(m.Results) > 1 {
