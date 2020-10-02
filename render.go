@@ -2,7 +2,8 @@ package autonats
 
 import (
 	"bytes"
-	"fmt"
+	"go/format"
+	"io/ioutil"
 	"path/filepath"
 	"sort"
 )
@@ -14,7 +15,7 @@ type RenderData struct {
 	Timeout                     int
 }
 
-func Render(data *RenderData) {
+func Render(data *RenderData) error {
 	data.Imports = append(data.Imports, "github.com/zyra/autonats", "github.com/nats-io/nats.go", "json", "time")
 
 	sort.Strings(data.Imports)
@@ -34,10 +35,14 @@ func Render(data *RenderData) {
 	err := tmplService.Execute(buff, data)
 
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	tempStr := buff.String()
-	fmt.Println(tempStr)
-	fmt.Println(outFile)
+	out, err := format.Source(buff.Bytes())
+
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(outFile, out, 0655)
 }

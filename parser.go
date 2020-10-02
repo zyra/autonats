@@ -86,7 +86,7 @@ func (par *Parser) Run() {
 	par.packages = packages
 }
 
-func (par *Parser) Render(outfile string, timeout int) {
+func (par *Parser) Render(baseDir, outfile string, timeout int) {
 	imports := make([]string, 0)
 
 	for i := range par.packages {
@@ -96,10 +96,11 @@ func (par *Parser) Render(outfile string, timeout int) {
 	}
 
 	data := RenderData{
-		FileName: outfile,
-		Path:     "./",
-		Services: par.services,
-		Imports:  imports,
+		FileName:    outfile,
+		Path:        baseDir,
+		Services:    par.services,
+		Imports:     imports,
+		Timeout:     timeout,
 	}
 
 	Render(&data)

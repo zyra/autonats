@@ -45,7 +45,7 @@ func main() {
 
 				parser.Run()
 
-				parser.Render(outFile, timeout)
+				parser.Render(baseDir, outFile, timeout)
 
 				return nil
 			},
