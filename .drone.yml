@@ -88,6 +88,6 @@ steps:
     - sha512
 ---
 kind: signature
-hmac: 6e02894600293932b93200745b99a7a44e6cef376304ae6369a0cb42e00e8257
+hmac: 5a66776e4de503ec51fff4d4dfe4302aa6f7928baf887e7a1dd9c009a4f4cc37
 
 ...
