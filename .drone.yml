@@ -24,7 +24,7 @@ x-docker-step: &docker-step
       from_secret: DOCKER_PASSWORD
 
 x-docker-auth:
-- &docker-auth docker login harbor.zyra.ca -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+- &docker-auth docker login docker.pkg.github.com -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
 
 
 steps:
@@ -88,6 +88,6 @@ steps:
     - sha512
 ---
 kind: signature
-hmac: 5a66776e4de503ec51fff4d4dfe4302aa6f7928baf887e7a1dd9c009a4f4cc37
+hmac: 18d81c1376bfcd03c2aa317249edc960121a5dad3459c1893eceaeb89f41800e
 
 ...
