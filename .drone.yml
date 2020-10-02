@@ -31,13 +31,13 @@ steps:
 - name: Build docker image
   <<: *docker-step
   commands:
-  - docker build -t harbor.zyra.ca/public/autonats:$BUILD_TAG .
+  - docker build -t docker.pkg.github.com/zyra/autonats/autonats:$BUILD_TAG .
 
 - name: Push docker image
   <<: *docker-step
   commands:
   - *docker-auth
-  - docker push harbor.zyra.ca/public/autonats:$BUILD_TAG
+  - docker push docker.pkg.github.com/zyra/autonats/autonats:$BUILD_TAG
 
 - name: Push latest docker image
   <<: *docker-step
@@ -46,8 +46,8 @@ steps:
     - master
   commands:
   - *docker-auth
-  - docker tag harbor.zyra.ca/public/autonats:$BUILD_TAG harbor.zyra.ca/public/autonats:latest
-  - docker push harbor.zyra.ca/public/autonats:latest
+  - docker tag docker.pkg.github.com/zyra/autonats/autonats:$BUILD_TAG docker.pkg.github.com/zyra/autonats/autonats:latest
+  - docker push docker.pkg.github.com/zyra/autonats/autonats:latest
 
 - name: Push version tagged image
   <<: *docker-step
@@ -56,8 +56,8 @@ steps:
     - tag
   commands:
   - *docker-auth
-  - docker tag harbor.zyra.ca/public/autonats:$BUILD_TAG harbor.zyra.ca/public/autonats:$DRONE_TAG
-  - docker push harbor.zyra.ca/public/autonats:$DRONE_TAG
+  - docker tag docker.pkg.github.com/zyra/autonats/autonats:$BUILD_TAG docker.pkg.github.com/zyra/autonats/autonats:$DRONE_TAG
+  - docker push docker.pkg.github.com/zyra/autonats/autonats:$DRONE_TAG
 
 
 - name: Build binaries
