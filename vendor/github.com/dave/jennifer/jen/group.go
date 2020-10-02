@@ -144,4 +144,3 @@ func (g *Group) RenderWithFile(writer io.Writer, file *File) error {
 	}
 	return nil
 }
-

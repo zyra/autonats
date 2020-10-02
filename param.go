@@ -5,91 +5,92 @@ import (
 	"strings"
 )
 
-type methodParam struct {
-	Name            string
-	Type            string
-	TypePackage     string
-	Pointer         bool
-	Array           bool
-	RequiredImports map[string]bool
+type Param struct {
+	Name, Type, TypePackage string
+	Pointer, Array          bool
+	RequiredImports         map[string]bool
 }
 
-func (p *methodParam) parse(f *ast.Field) {
-	p.RequiredImports = make(map[string]bool)
+func ParseParam(f *ast.Field) *Param {
+	param := &Param{
+		RequiredImports: make(map[string]bool),
+	}
 
-	switch f.Type.(type) {
+	switch p := f.Type.(type) {
 	case *ast.SelectorExpr:
-		p.typeFromSelectorExpr(f.Type.(*ast.SelectorExpr))
+		param.typeFromSelectorExpr(p)
 
 	case *ast.Ident:
-		p.typeFromIdent(f.Type.(*ast.Ident))
+		param.typeFromIdent(p)
 
 	case *ast.StarExpr:
-		p.typeFromStarExpr(f.Type.(*ast.StarExpr))
+		param.typeFromStarExpr(p)
 
 	case *ast.ArrayType:
-		p.typeFromArray(f.Type.(*ast.ArrayType))
+		param.typeFromArray(p)
 
 	default:
 		panic("unhandled type")
 	}
 
 	if len(f.Names) > 0 {
-		p.Name = f.Names[0].Name
+		param.Name = f.Names[0].Name
 	}
+
+	return param
 }
 
-func (p *methodParam) typeFromSelectorExpr(sExp *ast.SelectorExpr) {
+func (param *Param) typeFromSelectorExpr(sExp *ast.SelectorExpr) {
 	if sExp.X != nil {
 		ident := sExp.X.(*ast.Ident)
-		p.TypePackage = ident.Name
-		p.RequiredImports[ident.Name] = true
+		param.TypePackage = ident.Name
+		param.RequiredImports[ident.Name] = true
 	}
 
-	p.Type = sExp.Sel.Name
+	param.Type = sExp.Sel.Name
 
-	if p.Name == "" {
-		p.Name = strings.ToLower(sExp.Sel.Name)
+	if param.Name == "" {
+		param.Name = strings.ToLower(sExp.Sel.Name)
 	}
 }
 
-func (p *methodParam) typeFromStarExpr(sExp *ast.StarExpr) {
-	p.Pointer = true
+func (param *Param) typeFromStarExpr(sExp *ast.StarExpr) {
+	param.Pointer = true
 
 	switch sExp.X.(type) {
 	case *ast.Ident:
-		p.Type = sExp.X.(*ast.Ident).Name
-		p.Name = strings.ToLower(p.Type)
+		param.Type = sExp.X.(*ast.Ident).Name
+		param.Name = strings.ToLower(param.Type)
 	case *ast.SelectorExpr:
 		sExpX := sExp.X.(*ast.SelectorExpr)
-		p.typeFromSelectorExpr(sExpX)
-		p.Name = strings.ToLower(sExpX.Sel.Name)
+		param.typeFromSelectorExpr(sExpX)
+		param.Name = strings.ToLower(sExpX.Sel.Name)
 
 	default:
 		panic("unhandled type")
 	}
 }
 
-func (p *methodParam) typeFromIdent(ident *ast.Ident) {
-	p.Type = ident.Name
+func (param *Param) typeFromIdent(ident *ast.Ident) {
+	param.Type = ident.Name
 
-	if p.Name == "" {
-		p.Name = strings.ToLower(p.Name)
+	if param.Name == "" {
+		param.Name = strings.ToLower(param.Name)
 	}
 }
 
-func (p *methodParam) typeFromArray(arr *ast.ArrayType) {
-	p.Array = true
+func (param *Param) typeFromArray(arr *ast.ArrayType) {
+	param.Array = true
 
 	switch arr.Elt.(type) {
 	case *ast.SelectorExpr:
-		p.typeFromSelectorExpr(arr.Elt.(*ast.SelectorExpr))
+		param.typeFromSelectorExpr(arr.Elt.(*ast.SelectorExpr))
 
 	case *ast.Ident:
-		p.typeFromIdent(arr.Elt.(*ast.Ident))
+		param.typeFromIdent(arr.Elt.(*ast.Ident))
 
 	case *ast.StarExpr:
-		p.typeFromStarExpr(arr.Elt.(*ast.StarExpr))
+		param.typeFromStarExpr(arr.Elt.(*ast.StarExpr))
 
 	default:
 		panic("unhandled type")

@@ -5,6 +5,7 @@ import (
 	"github.com/zyra/autonats"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 var AppVersion = "0.0.1"
@@ -22,32 +23,44 @@ func main() {
 			Aliases: []string{"g"},
 			Usage:   "Generate NATS server handler + client files",
 			Action: func(ctx *cli.Context) error {
-				c := &autonats.ParserConfig{
-					BaseDir:     ctx.String("dir"),
-					NatsTimeout: ctx.Int("timeout"),
-					OutFileName: ctx.String("out"),
+				baseDir := ctx.String("dir")
+				timeout := ctx.Int("timeout")
+				outFile := ctx.String("out")
+
+				if outFile == "" {
+					outFile = "nats_client.go"
+				} else if filepath.Ext(outFile) != ".go" {
+					outFile += ".go"
 				}
 
-				if p, e := autonats.NewParser(c); e != nil {
-					return e
-				} else {
-					p.Run()
+				if timeout <= 0 {
+					timeout = 5
 				}
+
+				parser := autonats.NewParser()
+
+				if err := parser.ParseDir(baseDir); err != nil {
+					return err
+				}
+
+				parser.Run()
+
+				parser.Render(outFile, timeout)
 
 				return nil
 			},
 			Flags: []cli.Flag{
 				cli.StringFlag{
-					Name:     "dir, d",
-					Usage:    "Base directory to search for matching interfaces",
-					EnvVar:   "AUTONATS_BASE_DIR",
-					Value:    wd,
+					Name:   "dir, d",
+					Usage:  "Base directory to search for matching interfaces",
+					EnvVar: "AUTONATS_BASE_DIR",
+					Value:  wd,
 				},
 				cli.IntFlag{
-					Name:     "timeout, t",
-					Usage:    "NATS request timeout in seconds",
-					EnvVar:   "AUTONATS_REQUEST_TIMEOUT",
-					Value:    5,
+					Name:   "timeout, t",
+					Usage:  "NATS request timeout in seconds",
+					EnvVar: "AUTONATS_REQUEST_TIMEOUT",
+					Value:  5,
 				},
 				cli.StringFlag{
 					Name:   "out, o",
