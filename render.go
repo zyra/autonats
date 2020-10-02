@@ -2,6 +2,8 @@ package autonats
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"go/format"
 	"io/ioutil"
 	"path/filepath"
@@ -16,7 +18,16 @@ type RenderData struct {
 }
 
 func Render(data *RenderData) error {
-	data.Imports = append(data.Imports, "github.com/zyra/autonats", "github.com/nats-io/nats.go", "json", "time")
+	if data == nil || len(data.Services) == 0 {
+		return errors.New("no data found to render")
+	}
+
+	data.Imports = append(data.Imports,
+		"github.com/zyra/autonats",
+		"github.com/nats-io/nats.go",
+		"encoding/json",
+		"time",
+	)
 
 	sort.Strings(data.Imports)
 	sort.Slice(data.Services, func(i, j int) bool {
@@ -35,14 +46,20 @@ func Render(data *RenderData) error {
 	err := tmplService.Execute(buff, data)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to execute template: %s", err.Error())
 	}
 
 	out, err := format.Source(buff.Bytes())
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to run gofmt on generated source: %s", err.Error())
 	}
 
-	return ioutil.WriteFile(outFile, out, 0655)
+	fmt.Printf("rendering data to %s\n", outFile)
+
+	if err := ioutil.WriteFile(outFile, out, 0655); err != nil {
+		return fmt.Errorf("failed to write file: %s", err.Error())
+	} else {
+		return nil
+	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/urfave/cli"
 	"github.com/zyra/autonats"
 	"log"
@@ -37,17 +38,17 @@ func main() {
 					timeout = 5
 				}
 
+				fmt.Printf("parsing '%s' and will export to '%s'\n", baseDir, outFile)
+
 				parser := autonats.NewParser()
 
 				if err := parser.ParseDir(baseDir); err != nil {
-					return err
+					return fmt.Errorf("failed to parse the provided directory: %s", err.Error())
 				}
 
 				parser.Run()
 
-				parser.Render(baseDir, outFile, timeout)
-
-				return nil
+				return parser.Render(baseDir, outFile, timeout)
 			},
 			Flags: []cli.Flag{
 				cli.StringFlag{

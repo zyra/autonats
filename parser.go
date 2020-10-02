@@ -86,11 +86,11 @@ func (par *Parser) Run() {
 	par.packages = packages
 }
 
-func (par *Parser) Render(baseDir, outfile string, timeout int) {
+func (par *Parser) Render(baseDir, outfile string, timeout int) error {
 	imports := make([]string, 0)
 
-	for i := range par.packages {
-		for k, _ := range par.packages[i].Imports {
+	for pk, _ := range par.packages {
+		for k, _ := range par.packages[pk].Imports {
 			imports = append(imports, k)
 		}
 	}
@@ -103,5 +103,5 @@ func (par *Parser) Render(baseDir, outfile string, timeout int) {
 		Timeout:     timeout,
 	}
 
-	Render(&data)
+	return Render(&data)
 }
