@@ -170,14 +170,7 @@ func (client *ImageClient) GetByUserId(ctx context.Context, userId string) ([]*e
 		return nil, err
 	}
 
-	var data []byte
-	data, err = jsoniter.Marshal(ctx)
-	if err != nil {
-		reqSpan.LogFields(log.Error(err))
-		return nil, err
-	}
-
-	if _, err = t.Write(data); err != nil {
+	if _, err = t.Write([]byte(userId)); err != nil {
 		reqSpan.LogFields(log.Error(err))
 		return nil, err
 	}
@@ -228,14 +221,7 @@ func (client *ImageClient) GetCountByUserId(ctx context.Context, userId string) 
 		return 0, err
 	}
 
-	var data []byte
-	data, err = jsoniter.Marshal(ctx)
-	if err != nil {
-		reqSpan.LogFields(log.Error(err))
-		return 0, err
-	}
-
-	if _, err = t.Write(data); err != nil {
+	if _, err = t.Write([]byte(userId)); err != nil {
 		reqSpan.LogFields(log.Error(err))
 		return 0, err
 	}
@@ -428,7 +414,7 @@ func (client *UserClient) GetById(ctx context.Context, id []byte) (*example.User
 	}
 
 	var data []byte
-	data, err = jsoniter.Marshal(ctx)
+	data, err = jsoniter.Marshal(id)
 	if err != nil {
 		reqSpan.LogFields(log.Error(err))
 		return nil, err
@@ -486,7 +472,7 @@ func (client *UserClient) Create(ctx context.Context, user *example.User) error 
 	}
 
 	var data []byte
-	data, err = jsoniter.Marshal(ctx)
+	data, err = jsoniter.Marshal(user)
 	if err != nil {
 		reqSpan.LogFields(log.Error(err))
 		return err
