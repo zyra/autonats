@@ -120,13 +120,17 @@ const timeout = time.Second * {{ .Timeout }}
 				innerCtx, _ := context.WithTimeout(ctx, timeout)
 				innerCtxT := opentracing.ContextWithSpan(innerCtx, replySpan)
 
-				{{ $param := index $method.Params 1 }}
 
 				{{ $hasResult := gt (len $method.Results) 1 }}
 				
 				{{ if $hasResult }}
 				var result {{ template "type_ref_full" (index $method.Results 0) }}
 				{{ end }}
+
+				{{ $hasParam := gt (len $method.Params) 1 }}
+				{{ if $hasParam }}
+
+				{{ $param := index $method.Params 1 }}
 
 				{{ if eq $param.Type "string" -}}
 				{{ if $hasResult }}result, {{ end }} err = h.Server.{{ $method.Name }}(innerCtxT, string(msg.Data))
@@ -137,6 +141,10 @@ const timeout = time.Second * {{ .Timeout }}
                     return
                 }
 				{{ if $hasResult }}result, {{ end }} err = h.Server.{{ $method.Name }}(innerCtxT, {{ if and $param.Pointer (not $param.Array) }}&{{ end }}data)
+				{{ end }}
+
+				{{ else }}
+				{{ if $hasResult }}result, {{ end }} err = h.Server.{{ $method.Name }}(innerCtxT)
 				{{ end }}
 				
 				reply := autonats.GetReply()
@@ -228,28 +236,32 @@ const timeout = time.Second * {{ .Timeout }}
 			return {{ $nilResult }} err
 		}
 
-		{{ $param := index $method.Params 0 }}
-		{{ $isString := eq $param.Type "string" }}
-		
-		{{ if not $isString }}
-			var data []byte
-			data, err = jsoniter.Marshal({{ $param.Name }})
-			if err != nil {
+
+		{{ $hasParam := gt (len $method.Params) 1 }}
+		{{ if $hasParam }}
+			{{ $param := index $method.Params 1 }}
+			{{ $isString := eq $param.Type "string" }}
+			
+			{{ if not $isString }}
+				var data []byte
+				data, err = jsoniter.Marshal({{ $param.Name }})
+				if err != nil {
+					reqSpan.LogFields(log.Error(err))
+					return {{ $nilResult }} err
+				}
+			{{ end }}
+	
+			if _, err = t.Write(
+			{{- if eq $param.Type "string" -}}
+				[]byte({{ $param.Name }})
+			{{- else -}}
+				data
+			{{- end -}}
+			); err != nil {
 				reqSpan.LogFields(log.Error(err))
 				return {{ $nilResult }} err
 			}
-		{{ end }}
-
-		if _, err = t.Write(
-		{{- if eq $param.Type "string" -}}
-			[]byte($param.Name)
-		{{- else -}}
-			data
-		{{- end -}}
-		); err != nil {
-			reqSpan.LogFields(log.Error(err))
-			return {{ $nilResult }} err
-		}
+		{{ end }}	
 
 		reqCtx, cancelFn := context.WithTimeout(reqCtx, timeout)
 		defer cancelFn()
