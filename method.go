@@ -4,7 +4,7 @@ import (
 	"go/ast"
 )
 
-type Function struct {
+type Method struct {
 	Name               string
 	Params             []*Param
 	Results            []*Param
@@ -12,17 +12,17 @@ type Function struct {
 	HandlerConcurrency int
 }
 
-func FuncFromType(fxField *ast.Field) *Function {
-	fx := fxField.Type.(*ast.FuncType)
+func MethodFromField(field *ast.Field) *Method {
+	fx := field.Type.(*ast.FuncType)
 
 	nParams := fx.Params.NumFields()
 	nResults := fx.Results.NumFields()
 
-	m := &Function{
+	m := &Method{
 		Params:             make([]*Param, nParams, nParams),
 		Results:            make([]*Param, nResults, nResults),
 		imports:            make(map[string]bool),
-		Name:               fxField.Names[0].Name,
+		Name:               field.Names[0].Name,
 		HandlerConcurrency: 5,
 	}
 

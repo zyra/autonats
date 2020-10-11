@@ -2,8 +2,12 @@ package api
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/not.go"
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	"github.com/opentracing/opentracing-go/log"
 	"github.com/zyra/autonats"
 	"github.com/zyra/autonats/example"
 	"time"
@@ -24,13 +28,51 @@ type imageHandler struct {
 
 func (h *imageHandler) Run(ctx context.Context) error {
 	h.runners = make([]*autonats.Runner, 2, 2)
-	if runner, err := autonats.StartRunner(ctx, h.nc, "autonats.Image.GetByUserId", "autonats", 5, func(msg *nats.Msg) (interface{}, error) {
-		var data string
-		if err := json.Unmarshal(msg.Data, &data); err != nil {
-			return nil, err
-		} else {
-			innerCtx, _ := context.WithTimeout(ctx, time.Second*5)
-			return h.Server.GetByUserId(innerCtx, data)
+	tracer := opentracing.GlobalTracer()
+	if runner, err := autonats.StartRunner(ctx, h.nc, "autonats.Image.GetByUserId", "autonats", 5, func(msg *nats.Msg) {
+		t := not.NewTraceMsg(msg)
+		sc, err := tracer.Extract(opentracing.Binary, t)
+		if err != nil {
+			return
+		}
+
+		replySpan := tracer.StartSpan("Autonats ImageServer", ext.SpanKindRPCServer, ext.RPCServerOption(sc))
+		ext.MessageBusDestination.Set(replySpan, msg.Subject)
+		defer replySpan.Finish()
+		innerCtx, _ := context.WithTimeout(ctx, timeout)
+		innerCtxT := opentracing.ContextWithSpan(innerCtx, replySpan)
+
+		var result []*example.Image
+
+		result, err = h.Server.GetByUserId(innerCtxT, string(msg.Data))
+
+		reply := autonats.GetReply()
+		defer autonats.PutReply(reply)
+
+		if err != nil {
+			replySpan.LogFields(log.Event("Handler returned error"))
+			reply.Error = []byte(err.Error())
+
+		} else if result != nil {
+			replySpan.LogFields(log.Event("Handler returned a result"))
+			if err := reply.MarshalAndSetData(result); err != nil {
+				replySpan.LogFields(log.Error(err))
+				return
+			}
+
+		}
+
+		replyData, err := reply.MarshalBinary()
+
+		if err != nil {
+			replySpan.LogFields(log.Error(err))
+			return
+		}
+
+		replySpan.LogFields(log.Event("Sending reply"))
+		if err := msg.Respond(replyData); err != nil {
+			replySpan.LogFields(log.Error(err))
+			return
 		}
 	}); err != nil {
 		return err
@@ -38,15 +80,53 @@ func (h *imageHandler) Run(ctx context.Context) error {
 		h.runners[0] = runner
 	}
 
-	if runner, err := autonats.StartRunner(ctx, h.nc, "autonats.Image.GetCountByUserId", "autonats", 5, func(msg *nats.Msg) (interface{}, error) {
-		var data string
-		if err := json.Unmarshal(msg.Data, &data); err != nil {
-			return nil, err
-		} else {
-			innerCtx, _ := context.WithTimeout(ctx, time.Second*5)
-			return h.Server.GetCountByUserId(innerCtx, data)
+	if runner, err := autonats.StartRunner(ctx, h.nc, "autonats.Image.GetCountByUserId", "autonats", 5, func(msg *nats.Msg) {
+		t := not.NewTraceMsg(msg)
+		sc, err := tracer.Extract(opentracing.Binary, t)
+		if err != nil {
+			return
+		}
+
+		replySpan := tracer.StartSpan("Autonats ImageServer", ext.SpanKindRPCServer, ext.RPCServerOption(sc))
+		ext.MessageBusDestination.Set(replySpan, msg.Subject)
+		defer replySpan.Finish()
+		innerCtx, _ := context.WithTimeout(ctx, timeout)
+		innerCtxT := opentracing.ContextWithSpan(innerCtx, replySpan)
+
+		var result int
+
+		result, err = h.Server.GetCountByUserId(innerCtxT, string(msg.Data))
+
+		reply := autonats.GetReply()
+		defer autonats.PutReply(reply)
+
+		if err != nil {
+			replySpan.LogFields(log.Event("Handler returned error"))
+			reply.Error = []byte(err.Error())
+
+		} else if result != 0 {
+			replySpan.LogFields(log.Event("Handler returned a result"))
+			if err := reply.MarshalAndSetData(result); err != nil {
+				replySpan.LogFields(log.Error(err))
+				return
+			}
+
+		}
+
+		replyData, err := reply.MarshalBinary()
+
+		if err != nil {
+			replySpan.LogFields(log.Error(err))
+			return
+		}
+
+		replySpan.LogFields(log.Event("Sending reply"))
+		if err := msg.Respond(replyData); err != nil {
+			replySpan.LogFields(log.Error(err))
+			return
 		}
 	}); err != nil {
+		h.Shutdown()
 		return err
 	} else {
 		h.runners[1] = runner
@@ -57,7 +137,9 @@ func (h *imageHandler) Run(ctx context.Context) error {
 
 func (h *imageHandler) Shutdown() {
 	for i := range h.runners {
-		h.runners[i].Shutdown()
+		if h.runners[i] != nil {
+			_ = h.runners[i].Shutdown()
+		}
 	}
 }
 
@@ -69,28 +151,124 @@ func NewImageHandler(server ImageServer, nc *nats.Conn) autonats.Handler {
 }
 
 type ImageClient struct {
-	nc  *nats.EncodedConn
+	nc  *nats.Conn
 	log autonats.Logger
 }
 
 func (client *ImageClient) GetByUserId(ctx context.Context, userId string) ([]*example.Image, error) {
-	var dest []*example.Image
 
-	if err := autonats.SendRequest(ctx, client.nc, "autonats.Image.GetByUserId", userId, &dest); err != nil {
+	reqSpan, reqCtx := opentracing.StartSpanFromContext(ctx, "Autonats ImageClient Request", ext.SpanKindRPCClient)
+	ext.MessageBusDestination.Set(reqSpan, "autonats.Image.GetByUserId")
+	defer reqSpan.Finish()
+	reqSpan.LogFields(log.Event("Starting request"))
+
+	var t not.TraceMsg
+	var err error
+
+	if err = opentracing.GlobalTracer().Inject(reqSpan.Context(), opentracing.Binary, &t); err != nil {
+		reqSpan.LogFields(log.Error(err))
 		return nil, err
-	} else {
-		return dest, nil
 	}
+
+	var data []byte
+	data, err = jsoniter.Marshal(ctx)
+	if err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return nil, err
+	}
+
+	if _, err = t.Write(data); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return nil, err
+	}
+
+	reqCtx, cancelFn := context.WithTimeout(reqCtx, timeout)
+	defer cancelFn()
+
+	var replyMsg *nats.Msg
+	if replyMsg, err = client.nc.RequestWithContext(ctx, "autonats.Image.GetByUserId", t.Bytes()); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return nil, err
+	}
+
+	reqSpan.LogFields(log.Event("Reply received"))
+	reply := autonats.GetReply()
+	defer autonats.PutReply(reply)
+
+	if err := reply.UnmarshalBinary(replyMsg.Data); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return nil, err
+	}
+
+	if err := reply.GetError(); err != nil {
+		return nil, err
+	}
+
+	var result []*example.Image
+	if err := reply.UnmarshalData(&result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+
 }
 
 func (client *ImageClient) GetCountByUserId(ctx context.Context, userId string) (int, error) {
-	var dest int
 
-	if err := autonats.SendRequest(ctx, client.nc, "autonats.Image.GetCountByUserId", userId, &dest); err != nil {
+	reqSpan, reqCtx := opentracing.StartSpanFromContext(ctx, "Autonats ImageClient Request", ext.SpanKindRPCClient)
+	ext.MessageBusDestination.Set(reqSpan, "autonats.Image.GetCountByUserId")
+	defer reqSpan.Finish()
+	reqSpan.LogFields(log.Event("Starting request"))
+
+	var t not.TraceMsg
+	var err error
+
+	if err = opentracing.GlobalTracer().Inject(reqSpan.Context(), opentracing.Binary, &t); err != nil {
+		reqSpan.LogFields(log.Error(err))
 		return 0, err
-	} else {
-		return dest, nil
 	}
+
+	var data []byte
+	data, err = jsoniter.Marshal(ctx)
+	if err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return 0, err
+	}
+
+	if _, err = t.Write(data); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return 0, err
+	}
+
+	reqCtx, cancelFn := context.WithTimeout(reqCtx, timeout)
+	defer cancelFn()
+
+	var replyMsg *nats.Msg
+	if replyMsg, err = client.nc.RequestWithContext(ctx, "autonats.Image.GetCountByUserId", t.Bytes()); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return 0, err
+	}
+
+	reqSpan.LogFields(log.Event("Reply received"))
+	reply := autonats.GetReply()
+	defer autonats.PutReply(reply)
+
+	if err := reply.UnmarshalBinary(replyMsg.Data); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return 0, err
+	}
+
+	if err := reply.GetError(); err != nil {
+		return 0, err
+	}
+
+	var result int
+	if err := reply.UnmarshalData(&result); err != nil {
+		return 0, err
+	}
+
+	return result, nil
+
 }
 
 type UserServer interface {
@@ -106,13 +284,56 @@ type userHandler struct {
 
 func (h *userHandler) Run(ctx context.Context) error {
 	h.runners = make([]*autonats.Runner, 2, 2)
-	if runner, err := autonats.StartRunner(ctx, h.nc, "autonats.User.GetById", "autonats", 5, func(msg *nats.Msg) (interface{}, error) {
+	tracer := opentracing.GlobalTracer()
+	if runner, err := autonats.StartRunner(ctx, h.nc, "autonats.User.GetById", "autonats", 5, func(msg *nats.Msg) {
+		t := not.NewTraceMsg(msg)
+		sc, err := tracer.Extract(opentracing.Binary, t)
+		if err != nil {
+			return
+		}
+
+		replySpan := tracer.StartSpan("Autonats UserServer", ext.SpanKindRPCServer, ext.RPCServerOption(sc))
+		ext.MessageBusDestination.Set(replySpan, msg.Subject)
+		defer replySpan.Finish()
+		innerCtx, _ := context.WithTimeout(ctx, timeout)
+		innerCtxT := opentracing.ContextWithSpan(innerCtx, replySpan)
+
+		var result *example.User
+
 		var data []byte
-		if err := json.Unmarshal(msg.Data, &data); err != nil {
-			return nil, err
-		} else {
-			innerCtx, _ := context.WithTimeout(ctx, time.Second*5)
-			return h.Server.GetById(innerCtx, data)
+		if err = jsoniter.Unmarshal(msg.Data, &data); err != nil {
+			replySpan.LogFields(log.Error(err))
+			return
+		}
+		result, err = h.Server.GetById(innerCtxT, data)
+
+		reply := autonats.GetReply()
+		defer autonats.PutReply(reply)
+
+		if err != nil {
+			replySpan.LogFields(log.Event("Handler returned error"))
+			reply.Error = []byte(err.Error())
+
+		} else if result != nil {
+			replySpan.LogFields(log.Event("Handler returned a result"))
+			if err := reply.MarshalAndSetData(result); err != nil {
+				replySpan.LogFields(log.Error(err))
+				return
+			}
+
+		}
+
+		replyData, err := reply.MarshalBinary()
+
+		if err != nil {
+			replySpan.LogFields(log.Error(err))
+			return
+		}
+
+		replySpan.LogFields(log.Event("Sending reply"))
+		if err := msg.Respond(replyData); err != nil {
+			replySpan.LogFields(log.Error(err))
+			return
 		}
 	}); err != nil {
 		return err
@@ -120,15 +341,49 @@ func (h *userHandler) Run(ctx context.Context) error {
 		h.runners[0] = runner
 	}
 
-	if runner, err := autonats.StartRunner(ctx, h.nc, "autonats.User.Create", "autonats", 5, func(msg *nats.Msg) (interface{}, error) {
+	if runner, err := autonats.StartRunner(ctx, h.nc, "autonats.User.Create", "autonats", 5, func(msg *nats.Msg) {
+		t := not.NewTraceMsg(msg)
+		sc, err := tracer.Extract(opentracing.Binary, t)
+		if err != nil {
+			return
+		}
+
+		replySpan := tracer.StartSpan("Autonats UserServer", ext.SpanKindRPCServer, ext.RPCServerOption(sc))
+		ext.MessageBusDestination.Set(replySpan, msg.Subject)
+		defer replySpan.Finish()
+		innerCtx, _ := context.WithTimeout(ctx, timeout)
+		innerCtxT := opentracing.ContextWithSpan(innerCtx, replySpan)
+
 		var data example.User
-		if err := json.Unmarshal(msg.Data, &data); err != nil {
-			return nil, err
-		} else {
-			innerCtx, _ := context.WithTimeout(ctx, time.Second*5)
-			return nil, h.Server.Create(innerCtx, &data)
+		if err = jsoniter.Unmarshal(msg.Data, &data); err != nil {
+			replySpan.LogFields(log.Error(err))
+			return
+		}
+		err = h.Server.Create(innerCtxT, &data)
+
+		reply := autonats.GetReply()
+		defer autonats.PutReply(reply)
+
+		if err != nil {
+			replySpan.LogFields(log.Event("Handler returned error"))
+			reply.Error = []byte(err.Error())
+
+		}
+
+		replyData, err := reply.MarshalBinary()
+
+		if err != nil {
+			replySpan.LogFields(log.Error(err))
+			return
+		}
+
+		replySpan.LogFields(log.Event("Sending reply"))
+		if err := msg.Respond(replyData); err != nil {
+			replySpan.LogFields(log.Error(err))
+			return
 		}
 	}); err != nil {
+		h.Shutdown()
 		return err
 	} else {
 		h.runners[1] = runner
@@ -139,7 +394,9 @@ func (h *userHandler) Run(ctx context.Context) error {
 
 func (h *userHandler) Shutdown() {
 	for i := range h.runners {
-		h.runners[i].Shutdown()
+		if h.runners[i] != nil {
+			_ = h.runners[i].Shutdown()
+		}
 	}
 }
 
@@ -151,20 +408,116 @@ func NewUserHandler(server UserServer, nc *nats.Conn) autonats.Handler {
 }
 
 type UserClient struct {
-	nc  *nats.EncodedConn
+	nc  *nats.Conn
 	log autonats.Logger
 }
 
 func (client *UserClient) GetById(ctx context.Context, id []byte) (*example.User, error) {
-	var dest example.User
 
-	if err := autonats.SendRequest(ctx, client.nc, "autonats.User.GetById", id, &dest); err != nil {
+	reqSpan, reqCtx := opentracing.StartSpanFromContext(ctx, "Autonats UserClient Request", ext.SpanKindRPCClient)
+	ext.MessageBusDestination.Set(reqSpan, "autonats.User.GetById")
+	defer reqSpan.Finish()
+	reqSpan.LogFields(log.Event("Starting request"))
+
+	var t not.TraceMsg
+	var err error
+
+	if err = opentracing.GlobalTracer().Inject(reqSpan.Context(), opentracing.Binary, &t); err != nil {
+		reqSpan.LogFields(log.Error(err))
 		return nil, err
-	} else {
-		return &dest, nil
 	}
+
+	var data []byte
+	data, err = jsoniter.Marshal(ctx)
+	if err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return nil, err
+	}
+
+	if _, err = t.Write(data); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return nil, err
+	}
+
+	reqCtx, cancelFn := context.WithTimeout(reqCtx, timeout)
+	defer cancelFn()
+
+	var replyMsg *nats.Msg
+	if replyMsg, err = client.nc.RequestWithContext(ctx, "autonats.User.GetById", t.Bytes()); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return nil, err
+	}
+
+	reqSpan.LogFields(log.Event("Reply received"))
+	reply := autonats.GetReply()
+	defer autonats.PutReply(reply)
+
+	if err := reply.UnmarshalBinary(replyMsg.Data); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return nil, err
+	}
+
+	if err := reply.GetError(); err != nil {
+		return nil, err
+	}
+
+	var result example.User
+	if err := reply.UnmarshalData(&result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+
 }
 
 func (client *UserClient) Create(ctx context.Context, user *example.User) error {
-	return autonats.SendRequest(ctx, client.nc, "autonats.User.Create", user, nil)
+
+	reqSpan, reqCtx := opentracing.StartSpanFromContext(ctx, "Autonats UserClient Request", ext.SpanKindRPCClient)
+	ext.MessageBusDestination.Set(reqSpan, "autonats.User.Create")
+	defer reqSpan.Finish()
+	reqSpan.LogFields(log.Event("Starting request"))
+
+	var t not.TraceMsg
+	var err error
+
+	if err = opentracing.GlobalTracer().Inject(reqSpan.Context(), opentracing.Binary, &t); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return err
+	}
+
+	var data []byte
+	data, err = jsoniter.Marshal(ctx)
+	if err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return err
+	}
+
+	if _, err = t.Write(data); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return err
+	}
+
+	reqCtx, cancelFn := context.WithTimeout(reqCtx, timeout)
+	defer cancelFn()
+
+	var replyMsg *nats.Msg
+	if replyMsg, err = client.nc.RequestWithContext(ctx, "autonats.User.Create", t.Bytes()); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return err
+	}
+
+	reqSpan.LogFields(log.Event("Reply received"))
+	reply := autonats.GetReply()
+	defer autonats.PutReply(reply)
+
+	if err := reply.UnmarshalBinary(replyMsg.Data); err != nil {
+		reqSpan.LogFields(log.Error(err))
+		return err
+	}
+
+	if err := reply.GetError(); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -15,6 +15,8 @@ type RenderData struct {
 	Services                    []*Service
 	Imports                     []string
 	Timeout                     int
+	JsonLib                     string
+	Tracing                     bool
 }
 
 func Render(data *RenderData) error {
@@ -25,9 +27,17 @@ func Render(data *RenderData) error {
 	data.Imports = append(data.Imports,
 		"github.com/zyra/autonats",
 		"github.com/nats-io/nats.go",
-		"encoding/json",
 		"time",
+		"github.com/json-iterator/go",
 	)
+
+	if data.Tracing {
+		data.Imports = append(data.Imports,
+			"github.com/nats-io/not.go",
+			"github.com/opentracing/opentracing-go",
+			"github.com/opentracing/opentracing-go/ext",
+			"github.com/opentracing/opentracing-go/log")
+	}
 
 	sort.Strings(data.Imports)
 	sort.Slice(data.Services, func(i, j int) bool {
@@ -52,6 +62,7 @@ func Render(data *RenderData) error {
 	out, err := format.Source(buff.Bytes())
 
 	if err != nil {
+		_ = ioutil.WriteFile(outFile, buff.Bytes(), 0655)
 		return fmt.Errorf("failed to run gofmt on generated source: %s", err.Error())
 	}
 

@@ -48,7 +48,7 @@ func main() {
 
 				parser.Run()
 
-				return parser.Render(baseDir, outFile, timeout)
+				return parser.Render(baseDir, outFile, timeout, true)
 			},
 			Flags: []cli.Flag{
 				cli.StringFlag{
@@ -68,6 +68,11 @@ func main() {
 					Usage:  "Name to use for output file",
 					EnvVar: "AUTONATS_OUT_FILE",
 					Value:  "nats_client.go",
+				},
+				cli.BoolFlag{
+					Name:   "tracing",
+					Usage:  "Enable tracing",
+					EnvVar: "AUTONATS_TRACING",
 				},
 			},
 		},

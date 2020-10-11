@@ -86,21 +86,23 @@ func (par *Parser) Run() {
 	par.packages = packages
 }
 
-func (par *Parser) Render(baseDir, outfile string, timeout int) error {
+func (par *Parser) Render(baseDir, outfile string, timeout int, tracing bool) error {
 	imports := make([]string, 0)
 
-	for pk, _ := range par.packages {
-		for k, _ := range par.packages[pk].Imports {
+	for pk := range par.packages {
+		for k := range par.packages[pk].Imports {
 			imports = append(imports, k)
 		}
 	}
 
 	data := RenderData{
-		FileName:    outfile,
-		Path:        baseDir,
-		Services:    par.services,
-		Imports:     imports,
-		Timeout:     timeout,
+		FileName: outfile,
+		Path:     baseDir,
+		Services: par.services,
+		Imports:  imports,
+		Timeout:  timeout,
+		JsonLib:  "jsoniter",
+		Tracing:  tracing,
 	}
 
 	return Render(&data)

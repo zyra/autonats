@@ -15,7 +15,7 @@ const DocPrefix = "@nats:"
 type Service struct {
 	InterfaceID string
 	Name        string
-	Methods     []*Function
+	Methods     []*Method
 	Imports     map[string]string
 	Basedir     string
 	PackageName string
@@ -123,10 +123,10 @@ func ServicesFromFile(pkgName, fileName string, file *ast.File) []*Service {
 
 		svcConfig := ServiceConfigFromDoc(decl.Doc)
 
-		methods := make([]*Function, iface.Methods.NumFields())
+		methods := make([]*Method, iface.Methods.NumFields())
 
 		for i, m := range iface.Methods.List {
-			methods[i] = FuncFromType(m)
+			methods[i] = MethodFromField(m)
 		}
 
 		service := Service{
