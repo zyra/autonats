@@ -97,7 +97,7 @@ const timeout = time.Second * {{ .Timeout }}
 
     type {{ $handlerName }} struct {
         Server {{ $serverName }}
-        nc *nats.Conn
+        NatsConn *nats.Conn
         runners []*autonats.Runner
     }
 
@@ -107,7 +107,7 @@ const timeout = time.Second * {{ .Timeout }}
 
         {{- range $index, $method := $srv.Methods }}
             {{- $subject := subject $srv $method }}
-            if runner, err := autonats.StartRunner(ctx, h.nc, "{{ $subject }}", "autonats", {{ $method.HandlerConcurrency }}, func(msg *nats.Msg) {
+            if runner, err := autonats.StartRunner(ctx, h.NatsConn, "{{ $subject }}", "autonats", {{ $method.HandlerConcurrency }}, func(msg *nats.Msg) {
                 t := not.NewTraceMsg(msg)
 				sc, err := tracer.Extract(opentracing.Binary, t)
 				if err != nil {
@@ -202,11 +202,11 @@ const timeout = time.Second * {{ .Timeout }}
     func New{{ $srv.Name }}Handler(server {{ $serverName }}, nc *nats.Conn) autonats.Handler {
         return &{{ $handlerName }}{
             Server: server,
-            nc: nc,
+            NatsConn: nc,
         }
     }
 
-    type {{ $clientName }} struct { nc *nats.Conn }
+    type {{ $clientName }} struct { NatsConn *nats.Conn }
 
     {{ range $index, $method := .Methods }}
         func (client *{{ $clientName }}) {{ $method.Name }}({{ template "params" $method }}) {{ template "results" $method }} {
@@ -264,7 +264,7 @@ const timeout = time.Second * {{ .Timeout }}
 		defer cancelFn()
 
 		var replyMsg *nats.Msg
-		if replyMsg, err = client.nc.RequestWithContext(ctx, "{{ $subject }}", t.Bytes()); err != nil {
+		if replyMsg, err = client.NatsConn.RequestWithContext(ctx, "{{ $subject }}", t.Bytes()); err != nil {
 			reqSpan.LogFields(log.Error(err))
 			return {{ $nilResult }} err
 		}
