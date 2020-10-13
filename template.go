@@ -208,6 +208,10 @@ const timeout = time.Second * {{ .Timeout }}
 
     type {{ $clientName }} struct { NatsConn *nats.Conn }
 
+	func New{{ $clientName }}(nc *nats.Conn) *{{ $clientName }} {
+		return &{{ $clientName }}{ NatsConn: nc }
+	}
+
     {{ range $index, $method := .Methods }}
         func (client *{{ $clientName }}) {{ $method.Name }}({{ template "params" $method }}) {{ template "results" $method }} {
         {{- $subject := subject $srv $method }}
