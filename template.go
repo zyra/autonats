@@ -206,10 +206,7 @@ const timeout = time.Second * {{ .Timeout }}
         }
     }
 
-    type {{ $clientName }} struct {
-        nc *nats.Conn
-        log autonats.Logger
-    }
+    type {{ $clientName }} struct { nc *nats.Conn }
 
     {{ range $index, $method := .Methods }}
         func (client *{{ $clientName }}) {{ $method.Name }}({{ template "params" $method }}) {{ template "results" $method }} {
