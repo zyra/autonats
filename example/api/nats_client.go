@@ -21,15 +21,15 @@ type ImageServer interface {
 }
 
 type imageHandler struct {
-	Server  ImageServer
-	nc      *nats.Conn
-	runners []*autonats.Runner
+	Server   ImageServer
+	NatsConn *nats.Conn
+	runners  []*autonats.Runner
 }
 
 func (h *imageHandler) Run(ctx context.Context) error {
 	h.runners = make([]*autonats.Runner, 2, 2)
 	tracer := opentracing.GlobalTracer()
-	if runner, err := autonats.StartRunner(ctx, h.nc, "autonats.Image.GetByUserId", "autonats", 5, func(msg *nats.Msg) {
+	if runner, err := autonats.StartRunner(ctx, h.NatsConn, "autonats.Image.GetByUserId", "autonats", 5, func(msg *nats.Msg) {
 		t := not.NewTraceMsg(msg)
 		sc, err := tracer.Extract(opentracing.Binary, t)
 		if err != nil {
@@ -80,7 +80,7 @@ func (h *imageHandler) Run(ctx context.Context) error {
 		h.runners[0] = runner
 	}
 
-	if runner, err := autonats.StartRunner(ctx, h.nc, "autonats.Image.GetCountByUserId", "autonats", 5, func(msg *nats.Msg) {
+	if runner, err := autonats.StartRunner(ctx, h.NatsConn, "autonats.Image.GetCountByUserId", "autonats", 5, func(msg *nats.Msg) {
 		t := not.NewTraceMsg(msg)
 		sc, err := tracer.Extract(opentracing.Binary, t)
 		if err != nil {
@@ -145,14 +145,15 @@ func (h *imageHandler) Shutdown() {
 
 func NewImageHandler(server ImageServer, nc *nats.Conn) autonats.Handler {
 	return &imageHandler{
-		Server: server,
-		nc:     nc,
+		Server:   server,
+		NatsConn: nc,
 	}
 }
 
-type ImageClient struct {
-	nc  *nats.Conn
-	log autonats.Logger
+type ImageClient struct{ NatsConn *nats.Conn }
+
+func NewImageClient(nc *nats.Conn) *ImageClient {
+	return &ImageClient{NatsConn: nc}
 }
 
 func (client *ImageClient) GetByUserId(ctx context.Context, userId string) ([]*example.Image, error) {
@@ -179,7 +180,7 @@ func (client *ImageClient) GetByUserId(ctx context.Context, userId string) ([]*e
 	defer cancelFn()
 
 	var replyMsg *nats.Msg
-	if replyMsg, err = client.nc.RequestWithContext(ctx, "autonats.Image.GetByUserId", t.Bytes()); err != nil {
+	if replyMsg, err = client.NatsConn.RequestWithContext(ctx, "autonats.Image.GetByUserId", t.Bytes()); err != nil {
 		reqSpan.LogFields(log.Error(err))
 		return nil, err
 	}
@@ -230,7 +231,7 @@ func (client *ImageClient) GetCountByUserId(ctx context.Context, userId string) 
 	defer cancelFn()
 
 	var replyMsg *nats.Msg
-	if replyMsg, err = client.nc.RequestWithContext(ctx, "autonats.Image.GetCountByUserId", t.Bytes()); err != nil {
+	if replyMsg, err = client.NatsConn.RequestWithContext(ctx, "autonats.Image.GetCountByUserId", t.Bytes()); err != nil {
 		reqSpan.LogFields(log.Error(err))
 		return 0, err
 	}
@@ -263,15 +264,15 @@ type UserServer interface {
 }
 
 type userHandler struct {
-	Server  UserServer
-	nc      *nats.Conn
-	runners []*autonats.Runner
+	Server   UserServer
+	NatsConn *nats.Conn
+	runners  []*autonats.Runner
 }
 
 func (h *userHandler) Run(ctx context.Context) error {
 	h.runners = make([]*autonats.Runner, 2, 2)
 	tracer := opentracing.GlobalTracer()
-	if runner, err := autonats.StartRunner(ctx, h.nc, "autonats.User.GetById", "autonats", 5, func(msg *nats.Msg) {
+	if runner, err := autonats.StartRunner(ctx, h.NatsConn, "autonats.User.GetById", "autonats", 5, func(msg *nats.Msg) {
 		t := not.NewTraceMsg(msg)
 		sc, err := tracer.Extract(opentracing.Binary, t)
 		if err != nil {
@@ -327,7 +328,7 @@ func (h *userHandler) Run(ctx context.Context) error {
 		h.runners[0] = runner
 	}
 
-	if runner, err := autonats.StartRunner(ctx, h.nc, "autonats.User.Create", "autonats", 5, func(msg *nats.Msg) {
+	if runner, err := autonats.StartRunner(ctx, h.NatsConn, "autonats.User.Create", "autonats", 5, func(msg *nats.Msg) {
 		t := not.NewTraceMsg(msg)
 		sc, err := tracer.Extract(opentracing.Binary, t)
 		if err != nil {
@@ -388,14 +389,15 @@ func (h *userHandler) Shutdown() {
 
 func NewUserHandler(server UserServer, nc *nats.Conn) autonats.Handler {
 	return &userHandler{
-		Server: server,
-		nc:     nc,
+		Server:   server,
+		NatsConn: nc,
 	}
 }
 
-type UserClient struct {
-	nc  *nats.Conn
-	log autonats.Logger
+type UserClient struct{ NatsConn *nats.Conn }
+
+func NewUserClient(nc *nats.Conn) *UserClient {
+	return &UserClient{NatsConn: nc}
 }
 
 func (client *UserClient) GetById(ctx context.Context, id []byte) (*example.User, error) {
@@ -429,7 +431,7 @@ func (client *UserClient) GetById(ctx context.Context, id []byte) (*example.User
 	defer cancelFn()
 
 	var replyMsg *nats.Msg
-	if replyMsg, err = client.nc.RequestWithContext(ctx, "autonats.User.GetById", t.Bytes()); err != nil {
+	if replyMsg, err = client.NatsConn.RequestWithContext(ctx, "autonats.User.GetById", t.Bytes()); err != nil {
 		reqSpan.LogFields(log.Error(err))
 		return nil, err
 	}
@@ -487,7 +489,7 @@ func (client *UserClient) Create(ctx context.Context, user *example.User) error 
 	defer cancelFn()
 
 	var replyMsg *nats.Msg
-	if replyMsg, err = client.nc.RequestWithContext(ctx, "autonats.User.Create", t.Bytes()); err != nil {
+	if replyMsg, err = client.NatsConn.RequestWithContext(ctx, "autonats.User.Create", t.Bytes()); err != nil {
 		reqSpan.LogFields(log.Error(err))
 		return err
 	}
