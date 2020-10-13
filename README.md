@@ -49,7 +49,7 @@ You can run the tool by downloading it from the releases page, or by using the d
 $ autonats g 
 
 # Docker
-$ docker run -it --rm -v $(pwd):/root/ harbor.zyra.ca/public/autonats g
+$ docker run -it --rm -v $(pwd):/root/ docker.pkg.github.com/zyra/autonats/autonats:v1.0.1 g
 
 # TODO: upload to dockerhub
 ```
