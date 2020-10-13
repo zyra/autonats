@@ -114,12 +114,13 @@ const timeout = time.Second * {{ .Timeout }}
 					return
 				}
 		
-				replySpan := tracer.StartSpan("Autonats {{ $serverName }}", ext.SpanKindRPCServer, ext.RPCServerOption(sc))
+				replySpan := tracer.StartSpan("autonats:{{ $serverName }}:{{ $method.Name }}", ext.SpanKindRPCServer, ext.RPCServerOption(sc))
 				ext.MessageBusDestination.Set(replySpan, msg.Subject)
+				ext.Component.Set(replySpan, "autonats")
+
 				defer replySpan.Finish()
 				innerCtx, _ := context.WithTimeout(ctx, timeout)
 				innerCtxT := opentracing.ContextWithSpan(innerCtx, replySpan)
-
 
 				{{ $hasResult := gt (len $method.Results) 1 }}
 				
@@ -138,6 +139,7 @@ const timeout = time.Second * {{ .Timeout }}
                 var data {{ template "type_ref" $param }}
                 if err = {{ $.JsonLib }}.Unmarshal(msg.Data, &data); err != nil {
 					replySpan.LogFields(log.Error(err))
+					ext.Error.Set(replySpan, true)
                     return
                 }
 				{{ if $hasResult }}result, {{ end }} err = h.Server.{{ $method.Name }}(innerCtxT, {{ if and $param.Pointer (not $param.Array) }}&{{ end }}data)
@@ -154,13 +156,13 @@ const timeout = time.Second * {{ .Timeout }}
 				{{ $nilResult := nilResult $result }}
 	
 				if err != nil {
-					replySpan.LogFields(log.Event("Handler returned error"))
+					ext.Error.Set(replySpan, true)
 					reply.Error = []byte(err.Error())
 				{{ if $hasResult }}
 				} else if result != {{ $nilResult }} {
-					replySpan.LogFields(log.Event("Handler returned a result"))
 					if err := reply.MarshalAndSetData(result); err != nil {
 						replySpan.LogFields(log.Error(err))
+						ext.Error.Set(replySpan, true)
 						return
 					}
 				{{ end }}
@@ -170,12 +172,13 @@ const timeout = time.Second * {{ .Timeout }}
 
 				if err != nil {
 					replySpan.LogFields(log.Error(err))
+					ext.Error.Set(replySpan, true)
 					return
 				}
 		
-				replySpan.LogFields(log.Event("Sending reply"))
 				if err := msg.Respond(replyData); err != nil {
 					replySpan.LogFields(log.Error(err))
+					ext.Error.Set(replySpan, true)
 					return
 				}
             }); err != nil {
@@ -224,16 +227,17 @@ const timeout = time.Second * {{ .Timeout }}
 			{{ $nilResult = combine (nilResult $result)  ", "}}
 		{{ end }}
 		
-		reqSpan, reqCtx := opentracing.StartSpanFromContext(ctx, "Autonats {{ $clientName }} Request", ext.SpanKindRPCClient)
+		reqSpan, reqCtx := opentracing.StartSpanFromContext(ctx, "autonats:{{ $clientName }}:{{ $method.Name }}", ext.SpanKindRPCClient)
 		ext.MessageBusDestination.Set(reqSpan, "{{ $subject }}")
+		ext.Component.Set(reqSpan, "autonats")
 		defer reqSpan.Finish()
-		reqSpan.LogFields(log.Event("Starting request"))
 	
 		var t not.TraceMsg
 		var err error
 	
 		if err = opentracing.GlobalTracer().Inject(reqSpan.Context(), opentracing.Binary, &t); err != nil {
 			reqSpan.LogFields(log.Error(err))
+			ext.Error.Set(reqSpan, true)
 			return {{ $nilResult }} err
 		}
 
@@ -248,10 +252,10 @@ const timeout = time.Second * {{ .Timeout }}
 				data, err = jsoniter.Marshal({{ $param.Name }})
 				if err != nil {
 					reqSpan.LogFields(log.Error(err))
+					ext.Error.Set(reqSpan, true)
 					return {{ $nilResult }} err
 				}
 			{{ end }}
-	
 			if _, err = t.Write(
 			{{- if eq $param.Type "string" -}}
 				[]byte({{ $param.Name }})
@@ -260,29 +264,32 @@ const timeout = time.Second * {{ .Timeout }}
 			{{- end -}}
 			); err != nil {
 				reqSpan.LogFields(log.Error(err))
+				ext.Error.Set(reqSpan, true)
 				return {{ $nilResult }} err
 			}
 		{{ end }}	
 
 		reqCtx, cancelFn := context.WithTimeout(reqCtx, timeout)
 		defer cancelFn()
-
 		var replyMsg *nats.Msg
 		if replyMsg, err = client.NatsConn.RequestWithContext(ctx, "{{ $subject }}", t.Bytes()); err != nil {
 			reqSpan.LogFields(log.Error(err))
+			ext.Error.Set(reqSpan, true)
 			return {{ $nilResult }} err
 		}
 
-		reqSpan.LogFields(log.Event("Reply received"))
 		reply := autonats.GetReply()
 		defer autonats.PutReply(reply)
 		
 		if err := reply.UnmarshalBinary(replyMsg.Data); err != nil {
 			reqSpan.LogFields(log.Error(err))
+			ext.Error.Set(reqSpan, true)
 			return {{ $nilResult }} err
 		}
 
 		if err := reply.GetError(); err != nil {
+			reqSpan.LogFields(log.Error(err))
+			ext.Error.Set(reqSpan, true)
 			return {{ $nilResult }} err
 		}
 
@@ -294,9 +301,11 @@ const timeout = time.Second * {{ .Timeout }}
 			{{ if eq $result.Type "string" }}
 				return reply.GetDataAsString()
 			{{ else }}
-		
+
 			var result {{ template "type_ref" $result }}
 			if err := reply.UnmarshalData(&result); err != nil {
+				reqSpan.LogFields(log.Error(err))
+				ext.Error.Set(reqSpan, true)
 				return {{ $nilResult }} err
 			}
 	
