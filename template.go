@@ -134,10 +134,10 @@ const timeout = time.Second * {{ .Timeout }}
 				{{ $param := index $method.Params 1 }}
 
 				{{ if eq $param.Type "string" -}}
-				{{ if $hasResult }}result, {{ end }} err = h.Server.{{ $method.Name }}(innerCtxT, string(msg.Data))
+				{{ if $hasResult }}result, {{ end }} err = h.Server.{{ $method.Name }}(innerCtxT, string(t.Bytes()))
 				{{ else }}
                 var data {{ template "type_ref" $param }}
-                if err = {{ $.JsonLib }}.Unmarshal(msg.Data, &data); err != nil {
+                if err = {{ $.JsonLib }}.Unmarshal(t.Bytes(), &data); err != nil {
 					replySpan.LogFields(log.Error(err))
 					ext.Error.Set(replySpan, true)
                     return
