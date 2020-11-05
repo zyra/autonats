@@ -6,6 +6,7 @@ Generates a simple service mesh that runs over [NATS](https://nats.io) by parsin
 
 The project is still in early stages and supports basic use cases, see [Project info](#project-info) and [Ideas](#ideas) below to learn more about the project goals and vision.
 
+<br><br>
 
 ## Usage
 
@@ -132,6 +133,9 @@ Default concurrency for each method is 5. You can override this value using the 
 The concurrency option allows limiting the number of concurrent requests that a process can handle at the same time. This is useful to avoid a crash that disrupts multiple requests due to a panic/memory leak...etc. There is no recommended value to use, it depends on how confident you are with the handler code, if you have panic recovery logic in place, and if you have retry logic for critical requests. 
 
 
+
+<br><br>
+
 ## Project info
 This project aims to provide a simple service mesh implementation to allow various backend services to communicate. [NATS](https://nats.io) was picked as the transport layer since it provides a reliable messaging system with various features that can help this project grow without adding much complexity. 
 
@@ -139,7 +143,11 @@ This project aims to provide a simple service mesh implementation to allow vario
 
 **Load balancing**: NATS architecture provides load balancing out of the box and allows you to run your handlers anywhere as long as they are able to connect to NATS and subscribe to the relevant topics.
 
-#### Ideas
+
+
+<br><br>
+
+## Ideas
 The concepts below are just rough ideas and aren't planned for development yet. Most ideas are aimed to provide similar funcionality to alternative methods of creating service meshes, while keeping all components as modular as possible, and without adding much complexity.
 
 - **Versioning**: versioning services is useful specially for larger projects that can't always be updated at the same time. This is currently possible by simply adding new methods (e.g `GetByIdV2(...)`) but this might get messy. Ideally services and clients would be configured with a specific version, and NATS topics can be used to specify what version to connect to. Example: currently an Autonats generated service would use a topic similar to `autonats.user.GetById`, with versioning the topics would be prefixed with the service version: `autonats.user.v1.GetByID`
