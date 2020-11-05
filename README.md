@@ -150,15 +150,28 @@ This project aims to provide a simple service mesh implementation to allow vario
 ## Ideas
 The concepts below are just rough ideas and aren't planned for development yet. Most ideas are aimed to provide similar funcionality to alternative methods of creating service meshes, while keeping all components as modular as possible, and without adding much complexity.
 
-- **Versioning**: versioning services is useful specially for larger projects that can't always be updated at the same time. This is currently possible by simply adding new methods (e.g `GetByIdV2(...)`) but this might get messy. Ideally services and clients would be configured with a specific version, and NATS topics can be used to specify what version to connect to. Example: currently an Autonats generated service would use a topic similar to `autonats.user.GetById`, with versioning the topics would be prefixed with the service version: `autonats.user.v1.GetByID`
+<details>
+	<summary><b>Versioning</b></summary>
+	versioning services is useful specially for larger projects that can't always be updated at the same time. This is currently possible by simply adding new methods (e.g `GetByIdV2(...)`) but this might get messy. Ideally services and clients would be configured with a specific version, and NATS topics can be used to specify what version to connect to. Example: currently an Autonats generated service would use a topic similar to `autonats.user.GetById`, with versioning the topics would be prefixed with the service version: `autonats.user.v1.GetByID`
+</details>
+<details>
+	<summary><b>Metrics</b></summary>
+	 when deploying an Autonats service handler on *Kuberenetes*, it would be useful to have metrics that can trigger a *HorizontalPodAutoscaler* to scale up or down the Deployment. This can be done by exporting Kuberenetes Metrics API compatible metrics that indicate the current or average capacity. For example, with this metric value we can create an HPA that automatically scales a service when its average capacity is `2` or less since that indicates that the service is starting to become very busy.
+</details>
+<details>
+	<summary><b>Multi language support</b></summary>
+	currently Autonats is designed to create service meshes that connect Go services together. However, it can use the same parsed interfaces to generate TypeScript code, protobuf spec... etc. Alternatively it can support various inputs/outputs to allow defining servies in various ways and generating code for multiple languages.
+</details>
+<details>
+	<summary><b>Circuit breaking</b></summary>
+	This feature can be implemented in a distributed way *(i.e service handlers will automatically shutdown when error rate is above accepted threshold)* or it can be implemented with an external service *(e.g Kubernetes Operator)*. An external service would require that each service handler exports relevant metrics *(e.g error rate, avg req time)* to make decisions and then kill/restart the service based on the environment *(e.g restart docker container, delete k8s pod)*.
+</details>
 
-- **Metrics**: when deploying an Autonats service handler on *Kuberenetes*, it would be useful to have metrics that can trigger a *HorizontalPodAutoscaler* to scale up or down the Deployment. This can be done by exporting Kuberenetes Metrics API compatible metrics that indicate the current or average capacity. For example, with this metric value we can create an HPA that automatically scales a service when its average capacity is `2` or less since that indicates that the service is starting to become very busy.
-
-- **Multi language support**: currently Autonats is designed to create service meshes that connect Go services together. However, it can use the same parsed interfaces to generate TypeScript code, protobuf spec... etc. Alternatively it can support various inputs/outputs to allow defining servies in various ways and generating code for multiple languages. 
-
-- **Circuit breaking**: this feature can be implemented in a distributed way *(i.e service handlers will automatically shutdown when error rate is above accepted threshold)* or it can be implemented with an external service *(e.g Kubernetes Operator)*. An external service would require that each service handler exports relevant metrics *(e.g error rate, avg req time)* to make decisions and then kill/restart the service based on the environment *(e.g restart docker container, delete k8s pod)*.
-
-- **Kubernetes Operator**: build an operator that works alongside [NATS Operator](https://github.com/nats-io/nats-operator) to automatically deploy and configure services. The operator can manage NATS resource definitions to configure access for each service. Examples:
+<details>
+	<summary><b>Kubernetes Operator</b></summary>
+	Build an operator that works alongside [NATS Operator](https://github.com/nats-io/nats-operator) to automatically deploy and configure services. The operator can manage NATS resource definitions to configure access for each service.
+	
+	Examples:
 ```yaml
 ---
 # define a service with it's methods
@@ -214,3 +227,4 @@ metadata:
     autonats.zyra.ca/tls-path: "/path/to/tls/certs" 
 spec: {} # your spec goes here
 ```
+</details>
