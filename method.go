@@ -4,12 +4,14 @@ import (
 	"go/ast"
 )
 
+// Describes a service method that's exposed to the service mesh
 type Method struct {
 	Name               string
 	Params             []*Param
 	Results            []*Param
 	imports            map[string]bool
-	HandlerConcurrency int
+	HandlerConcurrency int // Method handler concurrency
+	Timeout            int // Method timeout
 }
 
 func MethodFromField(field *ast.Field) *Method {
@@ -23,7 +25,8 @@ func MethodFromField(field *ast.Field) *Method {
 		Results:            make([]*Param, nResults, nResults),
 		imports:            make(map[string]bool),
 		Name:               field.Names[0].Name,
-		HandlerConcurrency: 5,
+		HandlerConcurrency: 0, // TODO: add custom tag/comment to define concurrency for each method
+		Timeout:            0, // TODO: add custom  tag/comment to define timeout for each method
 	}
 
 	for ii, p := range fx.Params.List {

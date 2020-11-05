@@ -86,8 +86,6 @@ import (
 {{ end -}}
 )
 
-const timeout = time.Second * {{ .Timeout }}
-
 {{ range $srv := .Services }}
     {{ template "server_interface" $srv }}
 
@@ -119,7 +117,7 @@ const timeout = time.Second * {{ .Timeout }}
 				ext.Component.Set(replySpan, "autonats")
 
 				defer replySpan.Finish()
-				innerCtx, _ := context.WithTimeout(ctx, timeout)
+				innerCtx, _ := context.WithTimeout(ctx, time.Second * {{ $method.Timeout }})
 				innerCtxT := opentracing.ContextWithSpan(innerCtx, replySpan)
 
 				{{ $hasResult := gt (len $method.Results) 1 }}
@@ -269,7 +267,7 @@ const timeout = time.Second * {{ .Timeout }}
 			}
 		{{ end }}	
 
-		reqCtx, cancelFn := context.WithTimeout(reqCtx, timeout)
+		reqCtx, cancelFn := context.WithTimeout(reqCtx, time.Second * {{ $method.Timeout }})
 		defer cancelFn()
 		var replyMsg *nats.Msg
 		if replyMsg, err = client.NatsConn.RequestWithContext(ctx, "{{ $subject }}", t.Bytes()); err != nil {

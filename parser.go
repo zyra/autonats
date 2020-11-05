@@ -9,13 +9,16 @@ import (
 
 // Parser config
 type ParserConfig struct {
-	BaseDir        string // Directory containing interfaces to scan
-	DefaultTimeout int    // Timeout for NATS requests
-	OutputFileName string // Output file name
+	BaseDir            string // Directory containing interfaces to scan
+	DefaultTimeout     int    // Timeout for NATS requests
+	OutputFileName     string // Output file name
+	DefaultConcurrency int    // Default handler concurrency
+	Tracing            bool   // Generate tracing code
 }
 
 // Parser object
 type Parser struct {
+	config      *ParserConfig
 	services    []*Service
 	rawPackages map[string]*ast.Package
 	packages    map[string]*Package
@@ -36,11 +39,12 @@ func ParseDir(path string) (map[string]*ast.Package, error) {
 }
 
 // Creates a new parser with the provided config
-func NewParser() *Parser {
+func NewParser(config *ParserConfig) *Parser {
 	return &Parser{
+		config:      config,
 		services:    make([]*Service, 0),
-		packages:    make(map[string]*Package),
 		rawPackages: make(map[string]*ast.Package),
+		packages:    make(map[string]*Package),
 	}
 }
 
@@ -79,6 +83,16 @@ func (par *Parser) Run() {
 			packages[service.FileName] = pkg
 		}
 
+		for _, m := range service.Methods {
+			if m.Timeout <= 0 {
+				m.Timeout = par.config.DefaultTimeout
+			}
+
+			if m.HandlerConcurrency <= 0 {
+				m.HandlerConcurrency = par.config.DefaultConcurrency
+			}
+		}
+
 		pkg.AddService(service)
 	}
 
@@ -86,7 +100,7 @@ func (par *Parser) Run() {
 	par.packages = packages
 }
 
-func (par *Parser) Render(baseDir, outfile string, timeout int, tracing bool) error {
+func (par *Parser) Render() error {
 	imports := make([]string, 0)
 
 	for pk := range par.packages {
@@ -96,13 +110,13 @@ func (par *Parser) Render(baseDir, outfile string, timeout int, tracing bool) er
 	}
 
 	data := RenderData{
-		FileName: outfile,
-		Path:     baseDir,
+		FileName: par.config.OutputFileName,
+		Path:     par.config.BaseDir,
 		Services: par.services,
 		Imports:  imports,
-		Timeout:  timeout,
+		Timeout:  par.config.DefaultTimeout,
 		JsonLib:  "jsoniter",
-		Tracing:  tracing,
+		Tracing:  par.config.Tracing,
 	}
 
 	return Render(&data)

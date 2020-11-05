@@ -27,6 +27,7 @@ func main() {
 				baseDir := ctx.String("dir")
 				timeout := ctx.Int("timeout")
 				outFile := ctx.String("out")
+				conc := ctx.Int("concurrency")
 
 				if outFile == "" {
 					outFile = "nats_client.go"
@@ -38,9 +39,19 @@ func main() {
 					timeout = 5
 				}
 
+				if conc <= 0 {
+					conc = 5
+				}
+
 				fmt.Printf("parsing '%s' and will export to '%s'\n", baseDir, outFile)
 
-				parser := autonats.NewParser()
+				parser := autonats.NewParser(&autonats.ParserConfig{
+					BaseDir:            baseDir,
+					DefaultTimeout:     timeout,
+					OutputFileName:     outFile,
+					DefaultConcurrency: conc,
+					Tracing:            ctx.Bool("tracing"),
+				})
 
 				if err := parser.ParseDir(baseDir); err != nil {
 					return fmt.Errorf("failed to parse the provided directory: %s", err.Error())
@@ -48,7 +59,7 @@ func main() {
 
 				parser.Run()
 
-				return parser.Render(baseDir, outFile, timeout, true)
+				return parser.Render()
 			},
 			Flags: []cli.Flag{
 				cli.StringFlag{
@@ -71,8 +82,14 @@ func main() {
 				},
 				cli.BoolFlag{
 					Name:   "tracing",
-					Usage:  "Enable tracing",
+					Usage:  "Generate tracing code using OpenTracing library",
 					EnvVar: "AUTONATS_TRACING",
+				},
+				cli.IntFlag{
+					Name:   "concurrency, c",
+					Usage:  "Default handler concurrency",
+					EnvVar: "AUTONATS_CONCURRENCY",
+					Value:  5,
 				},
 			},
 		},
