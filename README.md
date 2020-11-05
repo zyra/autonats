@@ -2,9 +2,9 @@
 [![Build Status](https://drone.zyra.ca/api/badges/zyra/autonats/status.svg)](https://drone.zyra.ca/zyra/autonats)
 [![Go Report Card](https://goreportcard.com/badge/github.com/zyra/autonats)](https://goreportcard.com/badge/github.com/zyra/autonats)
 
-Generate NATS client code and server handlers from Go interfaces. 
+Generates a simple service mesh that runs over [NATS](https://nats.io) by parsing Go interface declarations. The genearted code simplifies the process of creating publishers and subscribers and make it easy for services to communicate.
 
-Useful for projects with multiple services that share some source code.
+The project is still in early stages and supports basic use cases, see [Project info](#project-info) and [Ideas](#ideas) below to learn more about the project goals and vision.
 
 
 ## Usage
