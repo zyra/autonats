@@ -270,7 +270,7 @@ import (
 		reqCtx, cancelFn := context.WithTimeout(reqCtx, time.Second * {{ $method.Timeout }})
 		defer cancelFn()
 		var replyMsg *nats.Msg
-		if replyMsg, err = client.NatsConn.RequestWithContext(ctx, "{{ $subject }}", t.Bytes()); err != nil {
+		if replyMsg, err = client.NatsConn.RequestWithContext(reqCtx, "{{ $subject }}", t.Bytes()); err != nil {
 			reqSpan.LogFields(log.Error(err))
 			ext.Error.Set(reqSpan, true)
 			return {{ $nilResult }} err
@@ -290,8 +290,6 @@ import (
 			ext.Error.Set(reqSpan, true)
 			return {{ $nilResult }} err
 		}
-
-		
 
 		{{ if $hasResult }}
 			{{ $result := (index $method.Results 0) }}
