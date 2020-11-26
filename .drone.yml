@@ -17,7 +17,7 @@ x-docker-step: &docker-step
   - name: dockersock
     path: /var/run/docker.sock
   environment:
-    BUILD_TAG: ${DRONE_BRANCH}-${DRONE_COMMIT}
+    BUILD_TAG: ${DRONE_COMMIT_SHA:0:7}
     DOCKER_USERNAME:
       from_secret: DOCKER_USERNAME
     DOCKER_PASSWORD:
@@ -89,6 +89,6 @@ steps:
     - sha512
 ---
 kind: signature
-hmac: 468183d729956f7ef0f7a8c23f26ff4e672fd8ee1f8246f130709c1f5a54c66e
+hmac: 193d9ed4987bc75c271358c134d12b8b0ac17f0403a9607698a30553f770a242
 
 ...
