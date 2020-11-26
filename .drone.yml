@@ -61,13 +61,14 @@ steps:
 
 
 - name: Build binaries
-  image: golang:1.12-alpine
+  image: golang:1.15-alpine
   when:
     event:
     - tag
   commands:
-  - apk add git make
+  - apk add git make upx
   - make build -j$(nproc)
+  - make compress -j$(nproc)
 
 - name: Publish binaries to Github
   image: plugins/github-release
@@ -88,6 +89,6 @@ steps:
     - sha512
 ---
 kind: signature
-hmac: 18d81c1376bfcd03c2aa317249edc960121a5dad3459c1893eceaeb89f41800e
+hmac: 468183d729956f7ef0f7a8c23f26ff4e672fd8ee1f8246f130709c1f5a54c66e
 
 ...
